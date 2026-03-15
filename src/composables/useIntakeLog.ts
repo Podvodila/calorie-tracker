@@ -1,18 +1,27 @@
-import { computed } from 'vue'
-import { useObservable } from '@vueuse/rxjs'
+import { ref, computed, watch, onScopeDispose } from 'vue'
 import { liveQuery } from 'dexie'
-import { from } from 'rxjs'
 import { db } from '@/db/database'
 import type { IntakeLogEntry, IntakeWithFood, NutritionSummary, MealType } from '@/db/types'
 
 export function useIntakeLog(date: () => string) {
-  const entries = useObservable(
-    from(liveQuery(() => db.intakeLog.where('date').equals(date()).toArray()))
-  )
+  const entries = ref<IntakeLogEntry[]>([])
+  const entriesWithFood = ref<IntakeWithFood[]>([])
 
-  const entriesWithFood = useObservable(
-    from(liveQuery(async () => {
-      const logs = await db.intakeLog.where('date').equals(date()).toArray()
+  let entriesSub: { unsubscribe(): void } | null = null
+  let foodSub: { unsubscribe(): void } | null = null
+
+  function subscribe(currentDate: string) {
+    entriesSub?.unsubscribe()
+    foodSub?.unsubscribe()
+
+    entriesSub = liveQuery(
+      () => db.intakeLog.where('date').equals(currentDate).toArray()
+    ).subscribe({
+      next: val => { entries.value = val },
+    })
+
+    foodSub = liveQuery(async () => {
+      const logs = await db.intakeLog.where('date').equals(currentDate).toArray()
       const result: IntakeWithFood[] = []
 
       for (const log of logs) {
@@ -46,8 +55,17 @@ export function useIntakeLog(date: () => string) {
         result.push(entry)
       }
       return result
-    }))
-  )
+    }).subscribe({
+      next: val => { entriesWithFood.value = val },
+    })
+  }
+
+  watch(() => date(), (newDate) => subscribe(newDate), { immediate: true })
+
+  onScopeDispose(() => {
+    entriesSub?.unsubscribe()
+    foodSub?.unsubscribe()
+  })
 
   const dailyTotals = computed<NutritionSummary>(() => {
     const items = entriesWithFood.value ?? []
