@@ -31,6 +31,7 @@ const showEditModal = ref(false)
 const editingEntry = ref<IntakeWithFood | null>(null)
 const editQuantity = ref(100)
 const editMealType = ref<MealType>('breakfast')
+const isSaving = ref(false)
 
 const editEstimatedCalories = computed(() => {
   if (!editingEntry.value) return 0
@@ -65,13 +66,18 @@ function handleEdit(id: number) {
 
 async function handleSaveEdit() {
   if (!editingEntry.value?.id) return
-  await updateIntake(editingEntry.value.id, {
-    quantity: editQuantity.value,
-    mealType: editMealType.value,
-  })
-  showEditModal.value = false
-  editingEntry.value = null
-  toast.success('Entry updated')
+  isSaving.value = true
+  try {
+    await updateIntake(editingEntry.value.id, {
+      quantity: editQuantity.value,
+      mealType: editMealType.value,
+    })
+    showEditModal.value = false
+    editingEntry.value = null
+    toast.success('Entry updated')
+  } finally {
+    isSaving.value = false
+  }
 }
 
 const showConfirmDelete = ref(false)
@@ -84,10 +90,15 @@ function handleDelete(id: number) {
 
 async function confirmDelete() {
   if (confirmDeleteId.value === null) return
-  await deleteIntake(confirmDeleteId.value)
-  toast.success('Entry removed')
-  showConfirmDelete.value = false
-  confirmDeleteId.value = null
+  isSaving.value = true
+  try {
+    await deleteIntake(confirmDeleteId.value)
+    toast.success('Entry removed')
+    showConfirmDelete.value = false
+    confirmDeleteId.value = null
+  } finally {
+    isSaving.value = false
+  }
 }
 </script>
 
@@ -163,9 +174,10 @@ async function confirmDelete() {
         <!-- Save -->
         <div class="sticky bottom-0 bg-bg-elevated pt-3 -mx-5 px-5 -mb-5 pb-5">
           <button
-            class="w-full py-3.5 rounded-xl text-sm font-semibold text-white bg-accent active:scale-[0.98] transition-transform"
+            class="w-full py-3.5 rounded-xl text-sm font-semibold text-white bg-accent active:scale-[0.98] transition-transform disabled:opacity-50"
+            :disabled="isSaving"
             @click="handleSaveEdit"
-          >Save Changes</button>
+          >{{ isSaving ? 'Saving...' : 'Save Changes' }}</button>
         </div>
       </div>
     </Modal>
@@ -173,6 +185,7 @@ async function confirmDelete() {
     <!-- Delete Confirmation -->
     <ConfirmDialog
       :open="showConfirmDelete"
+      :loading="isSaving"
       title="Delete Confirmation"
       message="Are you sure you want to delete this entry?"
       @confirm="confirmDelete"

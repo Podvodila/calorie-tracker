@@ -4,27 +4,16 @@ import { db } from '@/db/database'
 import type { IntakeLogEntry, IntakeWithFood, NutritionSummary, MealType } from '@/db/types'
 
 export function useIntakeLog(date: () => string) {
-  const entries = ref<IntakeLogEntry[]>([])
   const entriesWithFood = ref<IntakeWithFood[]>([])
 
-  let entriesSub: { unsubscribe(): void } | null = null
   let foodSub: { unsubscribe(): void } | null = null
 
   function subscribe(currentDate: string) {
-    entriesSub?.unsubscribe()
     foodSub?.unsubscribe()
-
-    entriesSub = liveQuery(
-      () => db.intakeLog.where('date').equals(currentDate).toArray()
-    ).subscribe({
-      next: val => { entries.value = val },
-    })
 
     foodSub = liveQuery(async () => {
       const logs = await db.intakeLog.where('date').equals(currentDate).toArray()
-      const result: IntakeWithFood[] = []
-
-      for (const log of logs) {
+      const result = await Promise.all(logs.map(async (log) => {
         const entry: IntakeWithFood = { ...log }
         if (log.foodId) {
           entry.food = await db.foods.get(log.foodId)
@@ -52,8 +41,8 @@ export function useIntakeLog(date: () => string) {
             }
           }
         }
-        result.push(entry)
-      }
+        return entry
+      }))
       return result
     }).subscribe({
       next: val => { entriesWithFood.value = val },
@@ -63,7 +52,6 @@ export function useIntakeLog(date: () => string) {
   watch(() => date(), (newDate) => subscribe(newDate), { immediate: true })
 
   onScopeDispose(() => {
-    entriesSub?.unsubscribe()
     foodSub?.unsubscribe()
   })
 
@@ -109,11 +97,13 @@ export function useIntakeLog(date: () => string) {
   })
 
   async function addIntake(entry: Omit<IntakeLogEntry, 'id'>) {
-    const id = await db.intakeLog.add(entry as IntakeLogEntry)
-    if (entry.foodId) {
-      await db.foods.update(entry.foodId, { lastUsed: Date.now() })
-    }
-    return id
+    return await db.transaction('rw', db.intakeLog, db.foods, async () => {
+      const id = await db.intakeLog.add(entry as IntakeLogEntry)
+      if (entry.foodId) {
+        await db.foods.update(entry.foodId, { lastUsed: Date.now() })
+      }
+      return id
+    })
   }
 
   async function updateIntake(id: number, changes: Partial<Pick<IntakeLogEntry, 'quantity' | 'mealType'>>) {
@@ -124,5 +114,5 @@ export function useIntakeLog(date: () => string) {
     await db.intakeLog.delete(id)
   }
 
-  return { entries, entriesWithFood, dailyTotals, mealGroups, addIntake, updateIntake, deleteIntake }
+  return { entriesWithFood, dailyTotals, mealGroups, addIntake, updateIntake, deleteIntake }
 }

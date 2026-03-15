@@ -3,6 +3,7 @@ const props = defineProps<{
   open: boolean
   title: string
   message: string
+  loading?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,9 +35,10 @@ const emit = defineEmits<{
               @click="emit('cancel')"
             >Cancel</button>
             <button
-              class="flex-1 py-3 rounded-xl text-sm font-semibold bg-danger text-white active:scale-[0.98] transition-transform"
+              class="flex-1 py-3 rounded-xl text-sm font-semibold bg-danger text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+              :disabled="loading"
               @click="emit('confirm')"
-            >Delete</button>
+            >{{ loading ? 'Deleting...' : 'Delete' }}</button>
           </div>
         </div>
       </div>

@@ -2,8 +2,6 @@
 import { ref, computed, nextTick, toRef, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFoodSearch } from '@/composables/useFoodSearch'
-import { useIntakeLog } from '@/composables/useIntakeLog'
-import { useOpenFoodFacts } from '@/composables/useOpenFoodFacts'
 import { useFoodImage } from '@/composables/useFoodImage'
 import { useUserCategories } from '@/composables/useUserCategories'
 import { useToast } from '@/composables/useToast'
@@ -18,8 +16,6 @@ const router = useRouter()
 const { query, results, selectedCategory, categories, isSearching } = useFoodSearch()
 const { categories: userCategories, addCategory, removeCategory, countFoodsByCategory } = useUserCategories()
 const today = () => new Date().toISOString().split('T')[0]
-const { addIntake } = useIntakeLog(today)
-const { importFood } = useOpenFoodFacts()
 const toast = useToast()
 
 const selectedFood = ref<Food | null>(null)
@@ -27,6 +23,7 @@ const { imageSrc: selectedFoodImage } = useFoodImage(selectedFood as Ref<Food>)
 const showIntakeModal = ref(false)
 const intakeQuantity = ref(100)
 const intakeMealType = ref<MealType>('lunch')
+const isSaving = ref(false)
 const selectedFoodCategory = ref<string | null>(null)
 const newCategoryInput = ref('')
 const showNewCategoryInput = ref(false)
@@ -86,24 +83,29 @@ async function addNewCategory() {
 
 async function saveIntake() {
   if (!selectedFood.value) return
-
-  let foodId = selectedFood.value.id
-  if (!foodId) {
-    foodId = await importFood(selectedFood.value)
+  isSaving.value = true
+  try {
+    await db.transaction('rw', db.foods, db.intakeLog, async () => {
+      let foodId = selectedFood.value!.id
+      if (!foodId) {
+        foodId = await db.foods.add(selectedFood.value! as Food) as number
+      }
+      await db.intakeLog.add({
+        foodId,
+        date: today(),
+        quantity: intakeQuantity.value,
+        mealType: intakeMealType.value,
+      } as any)
+      await db.foods.update(foodId!, { lastUsed: Date.now() })
+    })
+    showIntakeModal.value = false
+    selectedFood.value = null
+    await nextTick()
+    toast.success('Intake added!')
+    router.push('/')
+  } finally {
+    isSaving.value = false
   }
-
-  await addIntake({
-    foodId,
-    date: today(),
-    quantity: intakeQuantity.value,
-    mealType: intakeMealType.value,
-  })
-
-  showIntakeModal.value = false
-  selectedFood.value = null
-  await nextTick()
-  toast.success('Intake added!')
-  router.push('/')
 }
 
 const estimatedCalories = computed(() => {
@@ -285,9 +287,10 @@ const estimatedCalories = computed(() => {
 
         <button
           @click="saveIntake"
-          class="w-full py-3.5 rounded-xl text-sm font-semibold text-white bg-accent active:scale-[0.98] transition-transform"
+          :disabled="isSaving"
+          class="w-full py-3.5 rounded-xl text-sm font-semibold text-white bg-accent active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          Add to Log
+          {{ isSaving ? 'Saving...' : 'Add to Log' }}
         </button>
       </div>
     </Modal>

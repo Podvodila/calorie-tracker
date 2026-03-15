@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, watch, computed } from 'vue'
+import { reactive, ref, watch, computed } from 'vue'
 import { usePlan } from '@/composables/usePlan'
 import { useExportImport } from '@/composables/useExportImport'
 import { useFoodDatabase, COUNTRIES } from '@/composables/useFoodDatabase'
@@ -8,6 +8,11 @@ import ProgressBar from '@/components/ui/ProgressBar.vue'
 
 const { plan, savePlan } = usePlan()
 const { exportData, importData, isExporting, isImporting } = useExportImport()
+
+const appVersion = computed(() => {
+  const d = new Date(__APP_VERSION__)
+  return `v ${d.toLocaleDateString('en-CA')} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+})
 const { countryCounts, isDownloading, downloadProgress, downloadCountry, deleteCountry, cancelDownload } = useFoodDatabase()
 const toast = useToast()
 
@@ -18,6 +23,7 @@ const form = reactive({
 })
 
 const calculatedCalories = computed(() => form.dailyProtein * 4 + form.dailyCarbs * 4 + form.dailyFat * 9)
+const isSaving = ref(false)
 
 watch(plan, (p) => {
   if (p) {
@@ -28,8 +34,13 @@ watch(plan, (p) => {
 }, { immediate: true })
 
 async function save() {
-  await savePlan({ ...form, dailyCalories: calculatedCalories.value })
-  toast.success('Plan saved!')
+  isSaving.value = true
+  try {
+    await savePlan({ ...form, dailyCalories: calculatedCalories.value })
+    toast.success('Plan saved!')
+  } finally {
+    isSaving.value = false
+  }
 }
 
 async function handleDownload(code: string) {
@@ -119,9 +130,10 @@ function formatCount(n: number): string {
 
     <button
       @click="save"
-      class="w-full py-3.5 rounded-xl text-sm font-semibold text-white bg-accent active:scale-[0.98] transition-transform"
+      :disabled="isSaving"
+      class="w-full py-3.5 rounded-xl text-sm font-semibold text-white bg-accent active:scale-[0.98] transition-transform disabled:opacity-50"
     >
-      Save Plan
+      {{ isSaving ? 'Saving...' : 'Save Plan' }}
     </button>
 
     <section class="space-y-3">
@@ -202,5 +214,7 @@ function formatCount(n: number): string {
         </button>
       </div>
     </section>
+
+    <p class="text-xs text-text-muted text-center">{{ appVersion }}</p>
   </div>
 </template>

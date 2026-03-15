@@ -5,6 +5,9 @@ import { resolve } from 'path'
 
 export default defineConfig({
   base: '/calorie-tracker/',
+  define: {
+    __APP_VERSION__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     vue(),
     VitePWA({
