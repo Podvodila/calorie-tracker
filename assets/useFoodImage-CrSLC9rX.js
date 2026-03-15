@@ -1,1 +1,0 @@
-import{y as t,z as u,g as n}from"./index-Sr53bRsr.js";function m(o){const r=n(null);let e=null;function a(){e&&(URL.revokeObjectURL(e),e=null)}return t(o,l=>{a(),r.value=null,l&&(l.imageBlob?(e=URL.createObjectURL(l.imageBlob),r.value=e):l.imageUrl&&(r.value=l.imageUrl))},{immediate:!0}),u(a),{imageSrc:r}}export{m as u};
