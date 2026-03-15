@@ -19,19 +19,21 @@ export default defineConfig({
         theme_color: '#FAFAF7',
         background_color: '#FAFAF7',
         display: 'standalone',
+        scope: '/calorie-tracker/',
+        start_url: '/calorie-tracker/',
         icons: [
           {
-            src: '/icons/icon-192x192.svg',
+            src: 'icons/icon-192x192.svg',
             sizes: '192x192',
             type: 'image/svg+xml',
           },
           {
-            src: '/icons/icon-512x512.svg',
+            src: 'icons/icon-512x512.svg',
             sizes: '512x512',
             type: 'image/svg+xml',
           },
           {
-            src: '/icons/icon-512x512.svg',
+            src: 'icons/icon-512x512.svg',
             sizes: '512x512',
             type: 'image/svg+xml',
             purpose: 'any maskable',
