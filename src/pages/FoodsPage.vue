@@ -8,6 +8,7 @@ import FoodCard from '@/components/ui/FoodCard.vue'
 import Modal from '@/components/ui/Modal.vue'
 import FoodForm from '@/components/ui/FoodForm.vue'
 import RecipeForm from '@/components/ui/RecipeForm.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import type { Food, Recipe, RecipeItem, NutritionSummary } from '@/db/types'
 
 const { foods, addFood, updateFood, deleteFood } = useFoods()
@@ -21,6 +22,10 @@ const editingFood = ref<Food | undefined>()
 const editingRecipe = ref<Recipe | undefined>()
 const editingRecipeItems = ref<{ food: Food, quantity: number }[]>([])
 const recipeNutritions = ref<Map<number, NutritionSummary>>(new Map())
+
+const showConfirmDelete = ref(false)
+const confirmDeleteId = ref<number | null>(null)
+const confirmDeleteType = ref<'food' | 'recipe'>('food')
 
 async function handleSaveFood(food: Omit<Food, 'id'>) {
   if (editingFood.value?.id) {
@@ -44,9 +49,10 @@ function openAddFood() {
   showFoodModal.value = true
 }
 
-async function handleDeleteFood(id: number) {
-  await deleteFood(id)
-  toast.success('Food deleted')
+function handleDeleteFood(id: number) {
+  confirmDeleteId.value = id
+  confirmDeleteType.value = 'food'
+  showConfirmDelete.value = true
 }
 
 async function openEditRecipe(recipe: Recipe) {
@@ -81,10 +87,24 @@ async function handleSaveRecipe(recipe: Omit<Recipe, 'id'>, items: Omit<RecipeIt
   editingRecipeItems.value = []
 }
 
-async function handleDeleteRecipe(id: number) {
-  await deleteRecipe(id)
-  recipeNutritions.value.delete(id)
-  toast.success('Recipe deleted')
+function handleDeleteRecipe(id: number) {
+  confirmDeleteId.value = id
+  confirmDeleteType.value = 'recipe'
+  showConfirmDelete.value = true
+}
+
+async function confirmDelete() {
+  if (confirmDeleteId.value === null) return
+  if (confirmDeleteType.value === 'food') {
+    await deleteFood(confirmDeleteId.value)
+    toast.success('Food deleted')
+  } else {
+    await deleteRecipe(confirmDeleteId.value)
+    recipeNutritions.value.delete(confirmDeleteId.value)
+    toast.success('Recipe deleted')
+  }
+  showConfirmDelete.value = false
+  confirmDeleteId.value = null
 }
 
 async function loadRecipeNutrition(recipeId: number) {
@@ -199,5 +219,14 @@ watch(recipes, (list) => {
     <Modal :open="showRecipeModal" :title="editingRecipe ? 'Edit Recipe' : 'Add Recipe'" @close="showRecipeModal = false; editingRecipe = undefined; editingRecipeItems = []">
       <RecipeForm :recipe="editingRecipe" :initial-items="editingRecipeItems" @save="handleSaveRecipe" @cancel="showRecipeModal = false; editingRecipe = undefined; editingRecipeItems = []" />
     </Modal>
+
+    <!-- Delete Confirmation -->
+    <ConfirmDialog
+      :open="showConfirmDelete"
+      title="Delete Confirmation"
+      :message="confirmDeleteType === 'food' ? 'Are you sure you want to delete this food?' : 'Are you sure you want to delete this recipe?'"
+      @confirm="confirmDelete"
+      @cancel="showConfirmDelete = false"
+    />
   </div>
 </template>

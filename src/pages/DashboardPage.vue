@@ -6,6 +6,7 @@ import { useToast } from '@/composables/useToast'
 import NutritionGauge from '@/components/ui/NutritionGauge.vue'
 import MealGroup from '@/components/intake/MealGroup.vue'
 import Modal from '@/components/ui/Modal.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import type { MealType, IntakeWithFood } from '@/db/types'
 
 const today = () => new Date().toISOString().split('T')[0]
@@ -73,9 +74,20 @@ async function handleSaveEdit() {
   toast.success('Entry updated')
 }
 
-async function handleDelete(id: number) {
-  await deleteIntake(id)
+const showConfirmDelete = ref(false)
+const confirmDeleteId = ref<number | null>(null)
+
+function handleDelete(id: number) {
+  confirmDeleteId.value = id
+  showConfirmDelete.value = true
+}
+
+async function confirmDelete() {
+  if (confirmDeleteId.value === null) return
+  await deleteIntake(confirmDeleteId.value)
   toast.success('Entry removed')
+  showConfirmDelete.value = false
+  confirmDeleteId.value = null
 }
 </script>
 
@@ -157,5 +169,14 @@ async function handleDelete(id: number) {
         </div>
       </div>
     </Modal>
+
+    <!-- Delete Confirmation -->
+    <ConfirmDialog
+      :open="showConfirmDelete"
+      title="Delete Confirmation"
+      message="Are you sure you want to delete this entry?"
+      @confirm="confirmDelete"
+      @cancel="showConfirmDelete = false"
+    />
   </div>
 </template>

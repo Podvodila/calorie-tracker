@@ -62,13 +62,13 @@ interface ArcSegment {
   endDeg: number
 }
 
-function computeArcs(segments: Segment[], radius: number, opacity: number): ArcSegment[] {
+function computeArcs(segments: Segment[], radius: number, opacity: number, totalSpanDeg: number = 180): ArcSegment[] {
   const total = segments.reduce((s, seg) => s + seg.grams, 0)
   if (total === 0) return []
 
   const nonZero = segments.filter(s => s.grams > 0)
   const totalGapDeg = gapDeg * (nonZero.length > 1 ? nonZero.length : 0)
-  const availableDeg = 180 - totalGapDeg
+  const availableDeg = totalSpanDeg - totalGapDeg
 
   const arcs: ArcSegment[] = []
   let cursor = 180
@@ -99,11 +99,27 @@ function computeArcs(segments: Segment[], radius: number, opacity: number): ArcS
   return arcs
 }
 
+const targetTotal = computed(() => props.plan.dailyProtein + props.plan.dailyFat + props.plan.dailyCarbs)
+const currentTotal = computed(() => props.nutrition.protein + props.nutrition.fat + props.nutrition.carbs)
+
+const outerSpanDeg = computed(() => {
+  const max = Math.max(targetTotal.value, currentTotal.value)
+  if (max === 0) return 180
+  return (targetTotal.value / max) * 180
+})
+
+const innerSpanDeg = computed(() => {
+  const max = Math.max(targetTotal.value, currentTotal.value)
+  if (max === 0) return 180
+  return (currentTotal.value / max) * 180
+})
+
 const outerArcs = computed(() =>
   computeArcs(
     buildSegments(props.plan.dailyProtein, props.plan.dailyFat, props.plan.dailyCarbs),
     outerR,
     0.35,
+    outerSpanDeg.value,
   ),
 )
 
@@ -112,16 +128,11 @@ const innerArcs = computed(() =>
     buildSegments(props.nutrition.protein, props.nutrition.fat, props.nutrition.carbs),
     innerR,
     1,
+    innerSpanDeg.value,
   ),
 )
 
-const caloriesDiff = computed(() => props.nutrition.calories - props.plan.dailyCalories)
-const caloriesOver = computed(() => caloriesDiff.value > 0)
-const caloriesLabel = computed(() => {
-  const diff = caloriesDiff.value
-  if (diff > 0) return `+${diff} kcal`
-  return `${diff} kcal`
-})
+const caloriesOver = computed(() => props.nutrition.calories > props.plan.dailyCalories)
 
 
 function labelPos(midAngle: number, radius: number, offset: number = 0) {
@@ -148,11 +159,12 @@ const innerCaps = computed(() => endCap(innerArcs.value, innerR))
 function labelArcPath(startDeg: number, endDeg: number) {
   return arcPath(cx, cy, labelR, startDeg, endDeg)
 }
+
 </script>
 
 <template>
   <div class="bg-bg-card rounded-2xl px-2 pt-2 pb-3">
-    <svg viewBox="0 15 300 178" class="w-full" style="max-height: 200px">
+    <svg viewBox="-10 0 320 198" class="w-full" style="max-height: 210px">
       <defs>
         <!-- Label arc paths for curved text -->
         <path
@@ -224,7 +236,7 @@ function labelArcPath(startDeg: number, endDeg: number) {
       <!-- Curved macro name labels outside outer ring -->
       <template v-for="arc in outerArcs" :key="'name-' + arc.key">
         <text
-          v-if="arc.spanDeg > 22"
+          v-if="arc.spanDeg > 15"
           class="text-[9px] font-semibold pointer-events-none select-none"
           :fill="arc.color"
         >
@@ -256,15 +268,6 @@ function labelArcPath(startDeg: number, endDeg: number) {
         fill="#9B9B9B"
       >/ {{ plan.dailyCalories }} kcal</text>
 
-      <!-- Remaining / excess label -->
-      <text
-        :x="cx"
-        :y="cy + 18"
-        text-anchor="middle"
-        dominant-baseline="central"
-        class="text-[10px] font-semibold pointer-events-none select-none"
-        :fill="caloriesOver ? '#F87171' : '#9B9B9B'"
-      >{{ caloriesLabel }}</text>
     </svg>
 
   </div>

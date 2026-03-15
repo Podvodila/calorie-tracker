@@ -11,7 +11,7 @@ const typeStyles: Record<string, string> = {
 </script>
 
 <template>
-  <div class="fixed top-14 left-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+  <div class="fixed top-2 left-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
     <transition-group name="fade">
       <div
         v-for="toast in toasts"
